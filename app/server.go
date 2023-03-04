@@ -26,13 +26,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	c, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	ch := make(chan int)
+	for {
+		fmt.Println(ch)
+		c, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+		}
+		go handleConn(c, ch)
 	}
-	defer c.Close()
+}
 
+func handleConn(c net.Conn, ch chan int) {
 	for {
 		r := make([]byte, 256)
 
@@ -52,4 +57,5 @@ func main() {
 
 		c.Write([]byte(RedisSimpleString("PONG")))
 	}
+	c.Close()
 }
