@@ -26,18 +26,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	ch := make(chan int)
 	for {
-		fmt.Println(ch)
 		c, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 		}
-		go handleConn(c, ch)
+
+		go handleConn(c)
 	}
 }
 
-func handleConn(c net.Conn, ch chan int) {
+func handleConn(c net.Conn) {
 	for {
 		r := make([]byte, 256)
 
