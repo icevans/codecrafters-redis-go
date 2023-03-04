@@ -35,7 +35,14 @@ func main() {
 	for {
 		r := make([]byte, 256)
 		c.Read(r)
-		fmt.Println(string(r))
+
+		// If the first byte in our slice is empty, the client has
+		// disconnected. Or so it seems from my testing. How reliable
+		// is this?s
+		if r[0] == 0 {
+			break
+		}
+
 		c.Write([]byte(RedisSimpleString("PONG")))
 	}
 }
