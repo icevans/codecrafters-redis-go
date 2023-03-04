@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -34,13 +35,19 @@ func main() {
 
 	for {
 		r := make([]byte, 256)
-		c.Read(r)
 
-		// If the first byte in our slice is empty, the client has
-		// disconnected. Or so it seems from my testing. How reliable
-		// is this?s
-		if r[0] == 0 {
-			break
+		if _, err := c.Read(r); err != nil {
+			// Note, according to the Go docs on the io.Reader interface,
+			// even when an io.EOF error is thrown, the reader may have
+			// read a non-zero number of bytes, and so those should be
+			// considered before handling the error, so this is slightly
+			// incorrect.
+			if err == io.EOF {
+				break
+			} else {
+				fmt.Println("error reading client connection: ", err.Error())
+				os.Exit(1)
+			}
 		}
 
 		c.Write([]byte(RedisSimpleString("PONG")))
