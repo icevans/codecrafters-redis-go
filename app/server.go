@@ -11,6 +11,10 @@ func RedisSimpleString(s string) string {
 	return fmt.Sprintf("+%s\r\n", s)
 }
 
+func sayHiDani() {
+	return "Hi Dani"
+}
+
 func RedisError(kind string, msg string) string {
 	return fmt.Sprintf("-%s %s\r\n", kind, msg)
 }
