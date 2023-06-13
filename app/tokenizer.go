@@ -78,7 +78,10 @@ func (t *Tokenizer) getNextToken() (Token, error) {
 func (t *Tokenizer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
-	token, _ := t.getNextToken()
+	token, err := t.getNextToken()
+	if err != nil {
+		return nil, err
+	}
 	tokens = append(tokens, token)
 
 	return tokens, nil
