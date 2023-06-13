@@ -83,13 +83,11 @@ func handleConn(c net.Conn) {
 
 		if command.name == "ECHO" {
 			c.Write([]byte(RedisSimpleString(command.inputs[0])))
-		}
-
-		if command.name == "PING" {
+		} else if command.name == "PING" {
 			c.Write([]byte(RedisSimpleString("PONG")))
+		} else {
+			c.Write([]byte(RedisSimpleString("")))
 		}
-		
-		c.Write([]byte(RedisSimpleString("")))
 	}
 
 	c.Close()
