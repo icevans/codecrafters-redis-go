@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"strconv"
+	"strings"
 )
 
 // TODO: Handle PING command again
@@ -43,12 +44,12 @@ func (rp *RequestParser) Parse() (Command, error) {
 		return Command{}, errors.New("incorrect number of elements in input")
 	}
 
-	if _, ok := validCommands[request[0]]; !ok {
+	if _, ok := validCommands[strings.ToUpper(request[0])]; !ok {
 		return Command{}, errors.New("unknown command")
 	}
 
 	return Command{
-		name: request[0],
+		name: strings.ToUpper(request[0]),
 		inputs: request[1:],
 	}, nil
 }
