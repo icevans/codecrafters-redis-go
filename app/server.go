@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func RedisSimpleString(s string) string {
@@ -52,9 +53,9 @@ func handleConn(c net.Conn) {
 		tokens, _ := tokenizer.Tokenize()
 		command := tokens[0].subTokens[0].value
 
-		if command == "ECHO" {
+		if strings.ToUpper(command) == "ECHO" {
 			c.Write([]byte(RedisSimpleString(tokens[0].subTokens[1].value)))
-		} else if command == "PING" {
+		} else if strings.ToUpper(command) == "PING" {
 			c.Write([]byte(RedisSimpleString("PONG")))
 		} else {
 			c.Write([]byte(RedisSimpleString("")))
