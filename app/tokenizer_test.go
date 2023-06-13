@@ -1,26 +1,59 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"reflect"
 	"testing"
 )
 
 func TestTokenizer_tokenize_echo(t *testing.T) {
+	request := "*2\r\n$4\r\nECHO\r\n$11\r\nhello world\r\n"
 	tr := Tokenizer{
-		cursor: 0,
-		str:    "*3\r\n$4\r\nECHO\r\n$5\r\nhello\r\n$5\r\nworld\r\n",
+		rawRequest: bufio.NewReader(bytes.NewBufferString(request)),
 	}
 
-	tokens, _ := tr.Tokenize()
+	tokens, err := tr.Tokenize()
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
 
 	expected := []Token{
-		{kind: "ArrayDescriptor", value: "3"},
-		{kind: "BulkStringDescriptor", value: "4"},
-		{kind: "String", value: "ECHO"},
-		{kind: "BulkStringDescriptor", value: "5"},
-		{kind: "String", value: "hello"},
-		{kind: "BulkStringDescriptor", value: "5"},
-		{kind: "String", value: "world"},
+		{
+			kind: "BulkArray",
+			subTokens: []Token{
+				{kind: "BulkString", value: "ECHO"},
+				{kind: "BulkString", value: "hello world"},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(tokens, expected) {
+		t.Errorf("Got: %v, expected: %v", tokens, expected)
+		t.Fail()
+	}
+}
+
+func TestTokenizer_tokenize_echo_easy(t *testing.T) {
+	request := "*1\r\n$4\r\nPING\r\n$"
+	tr := Tokenizer{
+		rawRequest: bufio.NewReader(bytes.NewBufferString(request)),
+	}
+
+	tokens, err := tr.Tokenize()
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	expected := []Token{
+		{
+			kind: "BulkArray",
+			subTokens: []Token{
+				{kind: "BulkString", value: "PING"},
+			},
+		},
 	}
 
 	if !reflect.DeepEqual(tokens, expected) {

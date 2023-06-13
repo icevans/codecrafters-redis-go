@@ -1,70 +1,85 @@
 package main
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
+	"strconv"
 )
 
 type Token struct {
 	kind  string
 	value string
+	subTokens []Token
 }
 
 type Tokenizer struct {
-	cursor int
-	str    string
-}
-
-var kindLookup = map[string]string{
-	"*": "ArrayDescriptor",
-	"$": "BulkStringDescriptor",
+	rawRequest *bufio.Reader
 }
 
 func (t *Tokenizer) getNextToken() (Token, error) {
-	if t.cursor >= len(t.str) {
-		return Token{}, errors.New("no more to parse")
+	// TODO: reimplement this method with bufio.Scanner.Scan
+	RESPType, err := t.rawRequest.ReadByte()
+	if err != nil {
+		return Token{}, err
 	}
 
-	nextToken := []byte{}
-	for string(t.str[t.cursor]) != "\r" {
-		nextToken = append(nextToken, t.str[t.cursor])
-		t.cursor++
+	// TODO: rename bulkLengthBytes to bulkLengthBytes when moving to recursive lexer/parser
+	var bulkLengthBytes []byte
+	nextByte, err := t.rawRequest.ReadByte()
+	if err != nil {
+		return Token{}, err
 	}
 
-	t.cursor += 2 // Advance past next \r\n
+	for nextByte != '\r' {
+		bulkLengthBytes = append(bulkLengthBytes, nextByte)
+		nextByte, err = t.rawRequest.ReadByte()
+		if err != nil {
+			// unexpected, ended up with the rest of the string
+			return Token{}, err
+		}
+	}
 
-	// Baby's first lexer...
-	if kind, ok := kindLookup[string(nextToken[0])]; ok {
+	t.rawRequest.ReadByte() // Skip past the next \n
+
+	bulkLength, err := strconv.Atoi(string(bulkLengthBytes))
+	if err != nil {
+		return Token{}, fmt.Errorf("%v is not a valid bulk length", string(bulkLengthBytes))
+	}
+
+	if RESPType == '*' {
+		var arrayContents []Token
+		for i := 0; i < bulkLength; i++ {
+			arrayElement, _ := t.getNextToken()
+			arrayContents = append(arrayContents, arrayElement)
+		}
 		return Token{
-			kind: kind,
-			value: string(nextToken[1:]),
+			kind: "BulkArray",
+			subTokens: arrayContents,
+		}, nil
+	} else if RESPType == '$' {
+		var stringBytes []byte
+		for i := 0; i < bulkLength; i++ {
+			stringByte, _ := t.rawRequest.ReadByte()
+			stringBytes = append(stringBytes, stringByte)
+		}
+
+		t.rawRequest.Discard(2)
+
+		return Token{
+			kind: "BulkString",
+			value: string(stringBytes),
 		}, nil
 	} else {
-		return Token{
-			kind: "String",
-			value: string(nextToken[:]),
-		}, nil
+		return Token{}, errors.New("invalid RESP data type")
 	}
 }
 
 func (t *Tokenizer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
-	token, err := t.getNextToken()
-	if err != nil {
-		// TODO
-	}
+	token, _ := t.getNextToken()
 	tokens = append(tokens, token)
-
-	for err == nil {
-		token, err = t.getNextToken()
-		if err == nil {
-			tokens = append(tokens, token)
-		}
-	}
-
-	if err.Error() != "no more to parse" {
-		return nil, err
-	}
 
 	return tokens, nil
 }

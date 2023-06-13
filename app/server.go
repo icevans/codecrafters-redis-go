@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"net"
 	"os"
 )
@@ -40,55 +40,24 @@ func main() {
 }
 
 func handleConn(c net.Conn) {
+	defer c.Close()
+	
 	for {
-		r := make([]byte, 256)
-
-		n, err := c.Read(r)
-		
-		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				fmt.Println("error reading client connection: ", err.Error())
-				os.Exit(1)
-			}
-		}
-
-		r = r[:n]
-
-		for _, b := range(r) {
-			if b == 13 {
-				fmt.Print("\\r")
-			} else if b == 10 {
-				fmt.Print("\\n")
-			} else {
-				fmt.Printf("%v", string([]byte{b}))
-			}
-		}
-		fmt.Print("\n")
+		requestBuffer := bufio.NewReader(c)
 
 		tokenizer := Tokenizer{
-			cursor: 0,
-			str: string(r[:]),
+			rawRequest: requestBuffer,
 		}
 
 		tokens, _ := tokenizer.Tokenize()
+		command := tokens[0].subTokens[0].value
 
-		parser := RequestParser{
-			cursor: -1,
-			tokens: tokens,
-		}
-
-		command, _ := parser.Parse()
-
-		if command.name == "ECHO" {
-			c.Write([]byte(RedisSimpleString(command.inputs[0])))
-		} else if command.name == "PING" {
+		if command == "ECHO" {
+			c.Write([]byte(RedisSimpleString(tokens[0].subTokens[1].value)))
+		} else if command == "PING" {
 			c.Write([]byte(RedisSimpleString("PONG")))
 		} else {
 			c.Write([]byte(RedisSimpleString("")))
 		}
 	}
-
-	c.Close()
 }
