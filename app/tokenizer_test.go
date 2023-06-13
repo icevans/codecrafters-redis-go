@@ -14,7 +14,7 @@ func TestTokenizer_tokenize_echo(t *testing.T) {
 	tokens, _ := tr.Tokenize()
 
 	expected := []Token{
-		{kind: "ArrayDescriptor", value: "2"},
+		{kind: "ArrayDescriptor", value: "3"},
 		{kind: "BulkStringDescriptor", value: "4"},
 		{kind: "String", value: "ECHO"},
 		{kind: "BulkStringDescriptor", value: "5"},

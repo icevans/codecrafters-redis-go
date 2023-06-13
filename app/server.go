@@ -25,12 +25,15 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
+	fmt.Println("Listening on port 6379...")
 
 	for {
 		c, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 		}
+
+		fmt.Println("Received request...")
 
 		go handleConn(c)
 	}
@@ -40,7 +43,9 @@ func handleConn(c net.Conn) {
 	for {
 		r := make([]byte, 256)
 
-		if _, err := c.Read(r); err != nil {
+		n, err := c.Read(r)
+		
+		if err != nil {
 			if err == io.EOF {
 				break
 			} else {
@@ -49,24 +54,43 @@ func handleConn(c net.Conn) {
 			}
 		}
 
-		fmt.Println(string(r[:]))
+		r = r[:n]
 
-		c.Write([]byte(RedisSimpleString("PONG")))
+		for _, b := range(r) {
+			if b == 13 {
+				fmt.Print("\\r")
+			} else if b == 10 {
+				fmt.Print("\\n")
+			} else {
+				fmt.Printf("%v", string([]byte{b}))
+			}
+		}
+		fmt.Print("\n")
+
+		tokenizer := Tokenizer{
+			cursor: 0,
+			str: string(r[:]),
+		}
+
+		tokens, _ := tokenizer.Tokenize()
+
+		parser := RequestParser{
+			cursor: -1,
+			tokens: tokens,
+		}
+
+		command, _ := parser.Parse()
+
+		if command.name == "ECHO" {
+			c.Write([]byte(RedisSimpleString(command.inputs[0])))
+		}
+
+		if command.name == "PING" {
+			c.Write([]byte(RedisSimpleString("PONG")))
+		}
+		
+		c.Write([]byte(RedisSimpleString("")))
 	}
 
 	c.Close()
 }
-
-/*
-Parse command. Assumptions:
-1. An input is always a RESP array containing RESP bulk strings
-2. The command name will be the first element in the array
-3. An input only has one command
-
-- getNextToken... first time it should return array descriptor or error!
-- loop number of times from array descriptor
-	- getNextToken... it better be bulk string descriptor or error!
-	- getNextByteString with length from bulk string descriptor
-
--
-*/
