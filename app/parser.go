@@ -10,6 +10,7 @@ import (
 // TODO: Validate input to command
 var validCommands = map[string]struct{}{
 	"ECHO": {},
+	"PING": {},
 }
 
 type RequestParser struct {
