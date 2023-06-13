@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+// TODO: Handle PING command again
+// TODO: Validate input to command
 var validCommands = map[string]struct{}{
 	"ECHO": {},
 }
