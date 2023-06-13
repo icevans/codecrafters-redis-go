@@ -8,7 +8,7 @@ import (
 )
 
 func RedisSimpleString(s string) string {
-	return fmt.Sprintf("+%s", s)
+	return fmt.Sprintf("+%s\r\n", s)
 }
 
 func RedisError(kind string, msg string) string {
