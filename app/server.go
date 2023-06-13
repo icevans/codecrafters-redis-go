@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -49,8 +51,11 @@ func handleConn(c net.Conn) {
 		tokenizer := Tokenizer{
 			rawRequest: requestBuffer,
 		}
+		tokens, err := tokenizer.Tokenize()
+		if errors.Is(err, io.EOF) {
+			break
+		}
 
-		tokens, _ := tokenizer.Tokenize()
 		command := tokens[0].subTokens[0].value
 
 		if strings.ToUpper(command) == "ECHO" {
