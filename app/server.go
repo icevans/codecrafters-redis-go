@@ -7,7 +7,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func RedisSimpleString(s string) string {
@@ -26,6 +28,7 @@ type DataAccess struct {
 	operation string
 	key string
 	value string
+	expiry int64
 	responseCh chan string
 }
 
@@ -36,6 +39,7 @@ type EchoCommand struct {
 type SetCommand struct {
 	key string
 	value string
+	expiry int64
 }
 
 type GetCommand struct {
@@ -76,6 +80,8 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 	for {
 		requestBuffer := bufio.NewScanner	(c)
 
+		// TODO: Move the raw call to the tokenizer and then the construction of 
+		//       a command struct to its own CommandParser interface
 		tokenizer := Tokenizer{
 			rawRequest: requestBuffer,
 		}
@@ -86,15 +92,35 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 
 		var command interface{}
 		commandType := strings.ToUpper(tokens[0].subTokens[0].value)
-		if commandType == "ECHO" {
-			command = EchoCommand{value: tokens[0].subTokens[1].value}
-		} else if commandType == "SET" {
-			command = SetCommand{key: tokens[0].subTokens[1].value, value: tokens[0].subTokens[2].value}
-		} else if commandType == "GET" {
-			command = GetCommand{key: tokens[0].subTokens[1].value}
-		} else if commandType == "PING" {
+		switch commandType {
+		case "ECHO":
+			command = EchoCommand{
+				value: tokens[0].subTokens[1].value,
+			}
+		case "SET":
+			var expiry int64
+			// TODO: This is gross, but let's get it working before cleaning up
+			if len(tokens[0].subTokens) > 3 && tokens[0].subTokens[3].value == "PX" {
+				expiryInt, err := strconv.Atoi(tokens[0].subTokens[4].value)
+				if err != nil {
+					fmt.Println("invalid expiry")
+					break
+				}
+				expiry = int64(expiryInt)
+			}
+
+			command = SetCommand{
+				key: tokens[0].subTokens[1].value, 
+				value: tokens[0].subTokens[2].value,
+				expiry: expiry, // will treat the 0 value of int64 as not setting an expiry
+			}
+		case "GET":
+			command = GetCommand{
+				key: tokens[0].subTokens[1].value,
+			}
+		case "PING":
 			command = PingCommand{}
-		} else {
+		default:
 			command = UnknownCommand{}
 		}
 
@@ -107,6 +133,7 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 				operation: "write", 
 				key: resolvedCommand.key, 
 				value: resolvedCommand.value, 
+				expiry: resolvedCommand.expiry,
 				responseCh: responseCh,
 			}
 			response := <-responseCh
@@ -133,7 +160,11 @@ func closeConn(c net.Conn) {
 	c.Close()
 }
 
-func manageData(ch <-chan DataAccess) {
+func manageData(ch chan DataAccess) {
+	// TODO: Is this the most efficient data structure for a key value
+	//       store? Read and write are both O(1), but there's no simple
+	//       way to handle automatic eviction. We could consider an LRU
+	//       cache instead
 	dataStore := map[string]string{}
 
 	for v := range(ch) {
@@ -141,8 +172,27 @@ func manageData(ch <-chan DataAccess) {
 		case "write":
 			dataStore[v.key] = v.value
 			v.responseCh <- "OK"
+
+			if v.expiry > 0 {
+				go expireKey(v.key, v.expiry, ch)
+			}
 		case "read":
 			v.responseCh <- dataStore[v.key]
+		case "delete":
+			delete(dataStore, v.key)
+		}
+	}
+}
+
+func expireKey(key string, expiry int64, ch chan<- DataAccess) {
+	expiryStart := time.Now()
+	for {
+		if time.Since(expiryStart).Milliseconds() >= expiry {
+			ch <- DataAccess{
+				operation: "delete",
+				key: key,
+			}
+			break
 		}
 	}
 }
