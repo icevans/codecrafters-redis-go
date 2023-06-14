@@ -27,32 +27,40 @@ func (t *Tokenizer) getNextToken() (Token, error) {
 
 	descriptor := t.rawRequest.Text()
 	RESPType := descriptor[0]
-	bulkLengthString := descriptor[1:]
-	bulkLength, err := strconv.Atoi(string(bulkLengthString))
+	bulkLength, err := strconv.Atoi(descriptor[1:])
 	if err != nil {
-		return Token{}, fmt.Errorf("%v is not a valid bulk length", bulkLengthString)
+		return Token{}, fmt.Errorf("%v is not a valid bulk length", descriptor[1:])
 	}
 
 	if RESPType == '*' {
-		var arrayContents []Token
-		for i := 0; i < bulkLength; i++ {
-			arrayElement, _ := t.getNextToken()
-			arrayContents = append(arrayContents, arrayElement)
-		}
-		return Token{
-			kind: "BulkArray",
-			subTokens: arrayContents,
-		}, nil
+		return t.parseBulkArray(bulkLength)
 	} else if RESPType == '$' {
-		t.rawRequest.Scan()
-
-		return Token{
-			kind: "BulkString",
-			value: t.rawRequest.Text(),
-		}, nil
+		return t.parseBulkString(bulkLength)
 	} else {
 		return Token{}, errors.New("invalid RESP data type")
 	}
+}
+
+func (t *Tokenizer) parseBulkArray(bulkLength int) (Token, error) {
+	var arrayContents []Token
+	for i := 0; i < bulkLength; i++ {
+		arrayElement, _ := t.getNextToken()
+		arrayContents = append(arrayContents, arrayElement)
+	}
+	
+	return Token{
+		kind: "BulkArray",
+		subTokens: arrayContents,
+	}, nil
+}
+
+func (t *Tokenizer) parseBulkString(bulkLength int) (Token, error) {
+	t.rawRequest.Scan()
+
+	return Token{
+		kind: "BulkString",
+		value: t.rawRequest.Text(),
+	}, nil
 }
 
 func (t *Tokenizer) Tokenize() ([]Token, error) {
