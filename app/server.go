@@ -16,6 +16,14 @@ func RedisSimpleString(s string) string {
 	return fmt.Sprintf("+%s\r\n", s)
 }
 
+func RedisBulkString(s string) string {
+	if s == "" {
+		return "$-1\r\n"
+	}
+
+	return fmt.Sprintf("$%v\r\n%v\r\n", len(s), s)
+}
+
 func RedisError(kind string, msg string) string {
 	return fmt.Sprintf("-%s %s\r\n", kind, msg)
 }
@@ -146,7 +154,7 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 				responseCh: responseCh,
 			}
 			response := <-responseCh
-			c.Write([]byte(RedisSimpleString(response)))
+			c.Write([]byte(RedisBulkString(response)))
 		case PingCommand:
 			c.Write([]byte(RedisSimpleString("PONG")))
 		case UnknownCommand:
