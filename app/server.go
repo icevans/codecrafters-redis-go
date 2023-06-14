@@ -43,10 +43,10 @@ func main() {
 }
 
 func handleConn(c net.Conn) {
-	defer c.Close()
+	defer closeConn(c)
 	
 	for {
-		requestBuffer := bufio.NewReader(c)
+		requestBuffer := bufio.NewScanner(c)
 
 		tokenizer := Tokenizer{
 			rawRequest: requestBuffer,
@@ -66,4 +66,9 @@ func handleConn(c net.Conn) {
 			c.Write([]byte(RedisSimpleString("")))
 		}
 	}
+}
+
+func closeConn(c net.Conn) {
+	fmt.Println("closing connection")
+	c.Close()
 }

@@ -10,7 +10,7 @@ import (
 func TestTokenizer_tokenize_echo(t *testing.T) {
 	request := "*2\r\n$4\r\nECHO\r\n$11\r\nhello world\r\n"
 	tr := Tokenizer{
-		rawRequest: bufio.NewReader(bytes.NewBufferString(request)),
+		rawRequest: bufio.NewScanner(bytes.NewBufferString(request)),
 	}
 
 	tokens, err := tr.Tokenize()
@@ -38,7 +38,7 @@ func TestTokenizer_tokenize_echo(t *testing.T) {
 func TestTokenizer_tokenize_echo_easy(t *testing.T) {
 	request := "*1\r\n$4\r\nPING\r\n$"
 	tr := Tokenizer{
-		rawRequest: bufio.NewReader(bytes.NewBufferString(request)),
+		rawRequest: bufio.NewScanner(bytes.NewBufferString(request)),
 	}
 
 	tokens, err := tr.Tokenize()
