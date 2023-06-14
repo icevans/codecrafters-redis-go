@@ -108,7 +108,7 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 		case "SET":
 			var expiry int64
 			// TODO: This is gross, but let's get it working before cleaning up
-			if len(tokens[0].subTokens) > 3 && tokens[0].subTokens[3].value == "PX" {
+			if len(tokens[0].subTokens) > 3 && strings.ToUpper(tokens[0].subTokens[3].value) == "PX" {
 				expiryInt, err := strconv.Atoi(tokens[0].subTokens[4].value)
 				if err != nil {
 					fmt.Println("invalid expiry")
