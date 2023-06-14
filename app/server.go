@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 )
 
 func RedisSimpleString(s string) string {
@@ -84,7 +85,7 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 		}
 
 		var command interface{}
-		commandType := tokens[0].subTokens[0].value
+		commandType := strings.ToUpper(tokens[0].subTokens[0].value)
 		if commandType == "ECHO" {
 			command = EchoCommand{value: tokens[0].subTokens[1].value}
 		} else if commandType == "SET" {
