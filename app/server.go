@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -40,24 +37,6 @@ type DataAccess struct {
 	responseCh chan string
 }
 
-type EchoCommand struct {
-	value string
-}
-
-type SetCommand struct {
-	key string
-	value string
-	expiry int64
-}
-
-type GetCommand struct {
-	key string
-}
-
-type PingCommand struct {}
-
-type UnknownCommand struct {}
-
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {
@@ -86,78 +65,42 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 	defer closeConn(c)
 	
 	for {
-		requestBuffer := bufio.NewScanner	(c)
-
-		// TODO: Move the raw call to the tokenizer and then the construction of 
-		//       a command struct to its own CommandParser interface
-		tokenizer := Tokenizer{
-			rawRequest: requestBuffer,
-		}
-		tokens, err := tokenizer.Tokenize()
-		if errors.Is(err, io.EOF) {
-			break
+		command, err := parseCommand(c)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			fmt.Println(error.Error(err))
+			c.Write([]byte(RedisSimpleString(error.Error(err))))
+			continue
 		}
 
-		var command interface{}
-		commandType := strings.ToUpper(tokens[0].subTokens[0].value)
-		switch commandType {
-		case "ECHO":
-			command = EchoCommand{
-				value: tokens[0].subTokens[1].value,
-			}
-		case "SET":
-			var expiry int64
-			// TODO: This is gross, but let's get it working before cleaning up
-			if len(tokens[0].subTokens) > 3 && strings.ToUpper(tokens[0].subTokens[3].value) == "PX" {
-				expiryInt, err := strconv.Atoi(tokens[0].subTokens[4].value)
-				if err != nil {
-					fmt.Println("invalid expiry")
-					break
-				}
-				expiry = int64(expiryInt)
-			}
-
-			command = SetCommand{
-				key: tokens[0].subTokens[1].value, 
-				value: tokens[0].subTokens[2].value,
-				expiry: expiry, // will treat the 0 value of int64 as not setting an expiry
-			}
-		case "GET":
-			command = GetCommand{
-				key: tokens[0].subTokens[1].value,
-			}
-		case "PING":
-			command = PingCommand{}
-		default:
-			command = UnknownCommand{}
-		}
-
-		switch resolvedCommand := command.(type) {
-		case EchoCommand:
-			c.Write([]byte(RedisSimpleString(resolvedCommand.value)))
-		case SetCommand:
+		switch command.name {
+		case "EchoCommand":
+			c.Write([]byte(RedisSimpleString(command.input.value)))
+		case "SetCommand":
 			responseCh := make(chan string)
 			ch <- DataAccess{
 				operation: "write", 
-				key: resolvedCommand.key, 
-				value: resolvedCommand.value, 
-				expiry: resolvedCommand.expiry,
+				key: command.input.key, 
+				value: command.input.value, 
+				expiry: command.input.expiry,
 				responseCh: responseCh,
 			}
 			response := <-responseCh
 			c.Write([]byte(RedisSimpleString(response)))
-		case GetCommand:
+		case "GetCommand":
 			responseCh := make(chan string)
 			ch <- DataAccess{
-				operation: "read", 
-				key: resolvedCommand.key, 
+				operation: "read",
+				key: command.input.key, 
 				responseCh: responseCh,
 			}
 			response := <-responseCh
 			c.Write([]byte(RedisBulkString(response)))
-		case PingCommand:
+		case "PingCommand":
 			c.Write([]byte(RedisSimpleString("PONG")))
-		case UnknownCommand:
+		case "UnknownCommand":
 			c.Write([]byte(RedisSimpleString("")))
 		}
 	}
