@@ -87,6 +87,9 @@ func handleConn(c net.Conn, ch chan<- DataAccess) {
 				expiry: command.input.expiry,
 				responseCh: responseCh,
 			}
+			if command.input.expiry > 0 {
+				go expireKey(command.input.key, command.input.expiry, ch)
+			}
 			response := <-responseCh
 			c.Write([]byte(RedisSimpleString(response)))
 		case "GetCommand":
@@ -111,7 +114,7 @@ func closeConn(c net.Conn) {
 	c.Close()
 }
 
-func manageData(ch chan DataAccess) {
+func manageData(ch <-chan DataAccess) {
 	// TODO: Is this the most efficient data structure for a key value
 	//       store? Read and write are both O(1), but there's no simple
 	//       way to handle automatic eviction. We could consider an LRU
@@ -123,10 +126,6 @@ func manageData(ch chan DataAccess) {
 		case "write":
 			dataStore[v.key] = v.value
 			v.responseCh <- "OK"
-
-			if v.expiry > 0 {
-				go expireKey(v.key, v.expiry, ch)
-			}
 		case "read":
 			v.responseCh <- dataStore[v.key]
 		case "delete":
